@@ -103,6 +103,11 @@ export class App extends React.Component<{}, State> {
         var timer: number | null = null
         dataChannel.onopen = () => {
             console.log(target, "open data channel")
+            dataChannel.send(JSON.stringify({
+                type: "join",
+                userId: this.state.userId,
+                date: Date.now(),
+            } as ChatLog))
         }
         dataChannel.onclose = () => {
             console.log(target, "close data channel")
@@ -198,10 +203,18 @@ export class App extends React.Component<{}, State> {
         switch(log.type) {
         case "join":
             return <li key={log.date}>
-                {log.userId}と接続しました
+                <strong>{log.userId}</strong>と接続しました
+            </li>
+        case "leave":
+            return <li key={log.date}>
+                <strong>{log.userId}</strong>が去りました
+            </li>
+        case "plain":
+            return <li key={log.date}>
+                <strong>{log.userId}</strong>:&nbsp;{log.text}
             </li>
         default:
-            return <li key={log.date}>
+            return <li key={(log as any).date}>
                 {JSON.stringify(log)}
             </li>
         }
