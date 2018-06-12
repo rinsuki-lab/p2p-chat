@@ -1,6 +1,10 @@
+import express from "express"
+import http = require("http")
 import SocketIO from "socket.io"
 import uuid from "uuid/v4"
-const io = SocketIO(3000)
+const app = express()
+const httpServer = new http.Server(app)
+const io = SocketIO(httpServer)
 
 io.on("connect", sock => {
     const userId = uuid()
@@ -18,3 +22,7 @@ io.on("connect", sock => {
         io.emit("rtc-candidate", userId, candidate, target)
     })
 })
+
+app.use(express.static("public"))
+
+httpServer.listen(3000)
