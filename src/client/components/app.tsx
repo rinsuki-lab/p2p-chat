@@ -43,7 +43,7 @@ export class App extends React.Component<{}, State> {
             this.setState({
                 streams: {
                     ...this.state.streams,
-                    [target]: this.setupDataChannel(e.channel)
+                    [target]: this.setupDataChannel(e.channel, target)
                 }
             })
         }
@@ -53,7 +53,7 @@ export class App extends React.Component<{}, State> {
             this.setState({
                 streams: {
                     ...this.state.streams,
-                    [target]: this.setupDataChannel(dataChannel)
+                    [target]: this.setupDataChannel(dataChannel, target)
                 }
             })
         }
@@ -69,6 +69,10 @@ export class App extends React.Component<{}, State> {
                     userId: target,
                     date: Date.now(),
                 })
+                const { peers, streams } = this.state
+                delete peers[target]
+                this.setState({peers})
+                if (streams[target]) streams[target].close()
             }
         }
         this.setState({
@@ -87,7 +91,7 @@ export class App extends React.Component<{}, State> {
         })
     }
 
-    setupDataChannel(dataChannel: RTCDataChannel) {
+    setupDataChannel(dataChannel: RTCDataChannel, target: string) {
         console.log("readyState", dataChannel.readyState)
         dataChannel.onmessage = e => {
             var data = e.data
@@ -106,6 +110,9 @@ export class App extends React.Component<{}, State> {
             console.log("close data channel")
             if (timer) window.clearInterval(timer)
             timer = null
+            const streams = this.state.streams
+            delete streams[target]
+            this.setState({streams})
         }
         return dataChannel
     }
