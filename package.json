@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "build": "webpack --mode production"
+    "build": "webpack --mode production && tsc"
   },
   "devDependencies": {
     "@types/express": "^4.16.0",
