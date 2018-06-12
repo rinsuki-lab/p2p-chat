@@ -29,23 +29,10 @@ export class App extends React.Component<{}, State> {
             console.log(candidate)
             this.state.server.emit("rtc-candidate", candidate, target)
         }
-        peer.onaddstream = (e) => {
-            console.log(e)
-            const newStream = URL.createObjectURL(e.stream)
-            this.setState({streams: [
-                ...this.state.streams,
-                newStream,
-            ]})
-            console.log("onaddstream", e)
-        }
         (peer as any).ondatachannel = (e: any) => {
             console.log(e)
             e.channel.onmessage = (e: any) => console.warn(target, e.data)
         }
-        const { canvas } = this.refs as {canvas: HTMLCanvasElement & any}
-        const stream = canvas.captureStream(30)
-        // peer.addStream(stream)
-        console.log(stream)
         const dataChannel = (peer as any).createDataChannel("test", {ordered: true})
         dataChannel.onmessage = console.log
         dataChannel.onerror = console.error
@@ -114,26 +101,6 @@ export class App extends React.Component<{}, State> {
         return <div>
             <h1>chat</h1>
             <div>UserID: {this.state.userId}</div>
-            <canvas ref="canvas" onMouseMove={e => {
-                // const {x, y} = e.currentTarget.getClientRects()[0] as DOMRect
-                // const posX = e.clientX - Math.floor(x)
-                // const posY = e.clientY - Math.floor(y)
-                // console.log(posX, posY)
-                // const ctx = e.currentTarget.getContext("2d")
-                // if (!ctx) return
-                // ctx.fillStyle = "red"
-                // ctx.fillText("help", posX, posY)
-            }} style={{
-                borderStyle: "solid",
-                borderWidth: "1px",
-                borderColor: "#888",
-            }} width="320" height="240"/>
-            <h2>recv videos</h2>
-            {this.state.streams.map(url => <video src={url} key={url} style={{
-                borderStyle: "solid",
-                borderWidth: 1,
-                borderColor: "red",
-            }} controls autoPlay muted playsInline/>)}
         </div>
     }
 
@@ -141,15 +108,5 @@ export class App extends React.Component<{}, State> {
         setTimeout(() => {
             this.join()
         }, 2000)
-        const canvas = this.refs.canvas as HTMLCanvasElement
-        const ctx = canvas.getContext("2d")
-        if (ctx) setInterval(() => {
-            ctx.fillStyle = "white"
-            ctx.fillRect(0, 0, 320, 240)
-            ctx.fillStyle = "black"
-            ctx.font = "12px 'Monaco'"
-            ctx.fillText(this.state.userId || "undef", 0, 12)
-            ctx.fillText(new Date().toISOString(), 0, 24 + (new Date().getSeconds()))
-        }, 1000)
     }
 }
