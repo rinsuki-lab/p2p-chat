@@ -36,7 +36,6 @@ export class App extends React.Component<{}, State> {
             this.state.server.emit("rtc-candidate", candidate, target)
         }
         peer.ondatachannel = e => {
-            if (e.channel.label == "dummy") return
             if (isSeme) return
             console.log(e, isSeme)
             
@@ -47,7 +46,6 @@ export class App extends React.Component<{}, State> {
                 }
             })
         }
-        peer.onnegotiationneeded = console.log
         if (isSeme) {
             const dataChannel = peer.createDataChannel("chat", {ordered: true})
             this.setState({
@@ -60,7 +58,7 @@ export class App extends React.Component<{}, State> {
         var disconnected = false
         peer.oniceconnectionstatechange = e => {
             const state = peer.iceConnectionState
-            console.log(state)
+            console.log(target, "iceState", state)
             if (state === "failed" || state === "closed" || state === "disconnected") {
                 if (disconnected) return
                 disconnected = true
@@ -104,10 +102,10 @@ export class App extends React.Component<{}, State> {
         dataChannel.onerror = console.error
         var timer: number | null = null
         dataChannel.onopen = () => {
-            console.log("open data channel")
+            console.log(target, "open data channel")
         }
         dataChannel.onclose = () => {
-            console.log("close data channel")
+            console.log(target, "close data channel")
             if (timer) window.clearInterval(timer)
             timer = null
             const streams = this.state.streams
@@ -121,9 +119,9 @@ export class App extends React.Component<{}, State> {
         const { server } = this.state
         server.on("join", async (sender: string) => {
             if (sender === this.state.userId) return // これ俺
+
             console.log("recv join req", sender)
             const peer = this.getPeerCon(sender)
-            await new Promise(r => setTimeout(r, 1))
             const sdp = await peer.createOffer()
             await peer.setLocalDescription(sdp)
             console.log(sender, "send sdp offer")
