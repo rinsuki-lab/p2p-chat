@@ -116,6 +116,8 @@ export class App extends React.Component<{}, State> {
             const streams = this.state.streams
             delete streams[target]
             this.setState({streams})
+            const peer = this.state.peers[target]
+            if (peer) peer.close()
         }
         return dataChannel
     }
