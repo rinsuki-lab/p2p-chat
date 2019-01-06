@@ -17,4 +17,12 @@ interface ChatLogPlain {
     text: string
 }
 
-export type ChatLog = ChatLogJoin | ChatLogLeave | ChatLogPlain
+export interface ChatLogFileSend {
+    type: "file-send"
+    userId: string
+    name: string
+    fileSize: number
+    date: number
+}
+
+export type ChatLog = ChatLogJoin | ChatLogLeave | ChatLogPlain | ChatLogFileSend

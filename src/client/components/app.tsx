@@ -1,6 +1,6 @@
 import React = require("react")
 import io from "socket.io-client"
-import { ChatLog } from "./chatLog";
+import { ChatLog, ChatLogFileSend } from "./chatLog";
 
 interface State {
     peers: {[key: string]: RTCPeerConnection},
@@ -8,9 +8,27 @@ interface State {
     userId?: string
     streams: {[key: string]: RTCDataChannel}
     logs: ChatLog[]
-    text: string
+    text: string,
+    files: {[key: string]: {
+        name: string,
+        size: number,
+        progress: number,
+        buffer: Uint8Array,
+    }}
 }
 
+function blob2arraybuffer(blob: Blob): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+        const fileReader = new FileReader()
+        fileReader.onload = () => {
+            resolve(fileReader.result! as ArrayBuffer)
+        }
+        fileReader.onerror = () => {
+            reject(fileReader.error)
+        }
+        fileReader.readAsArrayBuffer(blob)
+    })
+}
 
 export class App extends React.Component<{}, State> {
     constructor(props: any) {
@@ -21,8 +39,37 @@ export class App extends React.Component<{}, State> {
             streams: {},
             logs: [],
             text: "",
+            files: {},
         }
         this.initIO()
+        addEventListener("DOMContentLoaded", () => {
+            document.body.ondragover = e => {
+                e.preventDefault()
+            }
+            document.body.ondrop = e => {
+                e.preventDefault()
+                const transfer = e.dataTransfer
+                if (transfer == null) return
+                (async (files) => {
+                    const packetLength = 1024 * 10
+                    for (const file of files) {
+                        console.log(file.name)
+                        const streams = Object.values(this.state.streams)
+                        streams.forEach(stream => stream.send(JSON.stringify({
+                            type: "file-send",
+                            name: file.name,
+                            fileSize: file.size,
+                            userId: this.state.userId,
+                            date: Date.now(),
+                        } as ChatLogFileSend)))
+                        for (var i=0; i<file.size; i+=packetLength) {
+                            const arrayBuffer = await blob2arraybuffer(file.slice(i, i + packetLength))
+                            streams.forEach(stream => stream.send(arrayBuffer))
+                        }
+                    }
+                })(Array.from(transfer.files))
+            }
+        })
     }
     getPeerCon(target: string, isSeme = true) {
         const peer = new RTCPeerConnection({iceServers: [
@@ -47,22 +94,23 @@ export class App extends React.Component<{}, State> {
             })
         }
         if (isSeme) {
-            const dataChannel = peer.createDataChannel("chat", {ordered: true})
+            const dataChannel = peer.createDataChannel("", {ordered: true})
             this.setState({
                 streams: {
                     ...this.state.streams,
-                    [target]: this.setupDataChannel(dataChannel, target)
+                    [target]: this.setupDataChannel(dataChannel, target),
                 }
             })
         }
         var disconnected = false
         peer.oniceconnectionstatechange = e => {
+            console.log(e)
             const state = peer.iceConnectionState
             console.log(target, "iceState", state)
             if (state === "failed" || state === "closed" || state === "disconnected") {
                 if (disconnected) return
                 disconnected = true
-                this.pushLog({
+                this.incomingLog({
                     type: "leave",
                     userId: target,
                     date: Date.now(),
@@ -70,7 +118,7 @@ export class App extends React.Component<{}, State> {
                 const { peers, streams } = this.state
                 delete peers[target]
                 this.setState({peers})
-                if (streams[target]) streams[target].close()
+                if (streams[target]) Object.values(streams[target]).map(channel => channel && channel.close())
             }
         }
         this.setState({
@@ -96,7 +144,27 @@ export class App extends React.Component<{}, State> {
             console.log(data)
             if (typeof data === "string") {
                 data = JSON.parse(data)
-                this.pushLog(data)
+                this.incomingLog(data)
+            } else if (data instanceof ArrayBuffer) {
+                const dataArr = new Uint8Array(data)
+                const file = this.state.files[target]
+                if (file == null) return
+                file.buffer.set(dataArr, file.progress)
+                file.progress += dataArr.length
+                console.log(file.progress, file.size)
+                this.setState({
+                    files: {
+                        ...this.state.files,
+                        [target]: file
+                    }
+                })
+                if (file.progress === file.size) {
+                    // finish
+                    const downloadLink = document.createElement("a")
+                    downloadLink.href = URL.createObjectURL(new Blob([file.buffer]))
+                    downloadLink.download = file.name
+                    downloadLink.click()
+                }
             }
         }
         dataChannel.onerror = console.error
@@ -163,26 +231,42 @@ export class App extends React.Component<{}, State> {
         server.emit("join")
     }
 
-    pushLog(log: ChatLog) {
-        this.setState({
-            logs: [
-                ...this.state.logs,
-                log
-            ]
-        })
+    incomingLog(log: ChatLog) {
+        console.log(log)
+        if(log.type === "file-send") {
+            const uuid = log.userId
+            this.setState({
+                files: {
+                    ...this.state.files,
+                    [uuid]: {
+                        name: log.name,
+                        size: log.fileSize,
+                        progress: 0,
+                        buffer: new Uint8Array(log.fileSize),
+                    }
+                }
+            })
+        }
     }
 
     publishChatLog(log: ChatLog) {
         Object.values(this.state.streams).forEach(stream => {
-            stream.send(JSON.stringify(log))
+            // stream.send(JSON.stringify(log))
         })
-        this.pushLog(log)
+        this.incomingLog(log)
     }
 
     render() {
         return <div>
             <h1>chat</h1>
             <div>UserID: {this.state.userId} Connection: {Object.keys(this.state.peers).length}</div>
+            <h2>files</h2>
+            <ul>
+                {Object.values(this.state.files).map(file => {
+                    return <li>{file.name} - <progress value={file.progress} max={file.size}/></li>
+                })}
+            </ul>
+
             <h2>logs</h2>
             <form action="javascript://" onSubmit={e => {
                 this.publishChatLog({

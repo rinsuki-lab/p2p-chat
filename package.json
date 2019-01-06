@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "webpack --mode production && tsc",
-    "dev": "npm-run-all -p dev:*",
+    "dev": "tsc && npm-run-all -p dev:*",
     "dev:webpack": "webpack-dev-server --mode development",
     "dev:tsc": "tsc -w --preserveWatchOutput",
     "dev:node": "node-dev dist/server/"
